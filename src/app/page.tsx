@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import {
   findOrCreateParticipant,
   submitPrd,
   submitArtifactUrl,
   subscribeParticipant,
-  getFeedbacksByParticipant,
+  subscribeFeedbacksByParticipant,
 } from '@/lib/database'
 import type { Participant, Feedback } from '@/types'
 import { STATUS_CONFIG } from '@/types'
@@ -31,25 +31,15 @@ export default function StudentPage() {
   const [submitting, setSubmitting] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState('')
 
-  // 실시간 구독
+  // 실시간 구독 (참가자 + 피드백)
   useEffect(() => {
     if (!participant?.id) return
-    const unsub = subscribeParticipant(participant.id, (p) => {
+    const unsub1 = subscribeParticipant(participant.id, (p) => {
       if (p) setParticipant(p)
     })
-    return () => unsub()
+    const unsub2 = subscribeFeedbacksByParticipant(participant.id, setFeedbacks)
+    return () => { unsub1(); unsub2() }
   }, [participant?.id])
-
-  // 피드백 로드
-  const loadFeedbacks = useCallback(async () => {
-    if (!participant?.id) return
-    const fbs = await getFeedbacksByParticipant(participant.id)
-    setFeedbacks(fbs)
-  }, [participant?.id])
-
-  useEffect(() => {
-    loadFeedbacks()
-  }, [loadFeedbacks])
 
   const handleIdentify = async (e: React.FormEvent) => {
     e.preventDefault()

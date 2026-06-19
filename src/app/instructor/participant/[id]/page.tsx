@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  getParticipant,
-  getFeedbacksByParticipant,
+  subscribeParticipant,
+  subscribeFeedbacksByParticipant,
   saveFeedbackDraft,
   saveLinkTestLog,
 } from '@/lib/database'
@@ -27,22 +27,15 @@ export default function ParticipantDetailPage({
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
 
-  const load = useCallback(async () => {
-    const p = await getParticipant(params.id)
-    if (!p) {
-      setError('참가자를 찾을 수 없습니다.')
-      setLoading(false)
-      return
-    }
-    setParticipant(p)
-    const fbs = await getFeedbacksByParticipant(params.id)
-    setFeedbacks(fbs)
-    setLoading(false)
-  }, [params.id])
-
   useEffect(() => {
-    load()
-  }, [load])
+    const unsub1 = subscribeParticipant(params.id, (p) => {
+      if (!p) { setError('참가자를 찾을 수 없습니다.'); setLoading(false); return }
+      setParticipant(p)
+      setLoading(false)
+    })
+    const unsub2 = subscribeFeedbacksByParticipant(params.id, setFeedbacks)
+    return () => { unsub1(); unsub2() }
+  }, [params.id])
 
   const showMessage = (msg: string) => {
     setMessage(msg)
@@ -77,7 +70,6 @@ export default function ParticipantDetailPage({
 
       await saveFeedbackDraft(participant.id, data.feedback, round)
       showMessage('✅ AI 피드백 초안이 생성되었습니다! 검토 화면으로 이동하세요.')
-      await load()
     } catch (err) {
       setError(err instanceof Error ? err.message : '오류가 발생했습니다.')
     } finally {
@@ -108,7 +100,6 @@ export default function ParticipantDetailPage({
         const draft = `🔗 산출물 링크 분석 피드백\n\n${data.aiAnalysis}`
         const newFeedbackId = await saveFeedbackDraft(participant.id, draft, 1)
         if (data.log) await saveLinkTestLog(newFeedbackId, data.log)
-        await load()
         showMessage('✅ 링크 분석 완료! 아래 피드백 히스토리에서 검토 후 발송하세요.')
       }
     } catch (err) {

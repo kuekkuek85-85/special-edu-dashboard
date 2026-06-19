@@ -224,6 +224,22 @@ export async function getFeedbacksByParticipant(
     .sort((a, b) => (a.createdAt as number) - (b.createdAt as number))
 }
 
+// ── 참가자 피드백 실시간 구독 ─────────────────────────────────────
+export function subscribeFeedbacksByParticipant(
+  participantId: string,
+  callback: (feedbacks: Feedback[]) => void,
+): Unsubscribe {
+  return onValue(ref(db, 'feedbacks'), (snap) => {
+    if (!snap.exists()) { callback([]); return }
+    const val = snap.val() as Record<string, Omit<Feedback, 'id'>>
+    const list = Object.entries(val)
+      .map(([id, data]) => ({ id, ...data }) as Feedback)
+      .filter((f) => f.participantId === participantId)
+      .sort((a, b) => (a.createdAt as number) - (b.createdAt as number))
+    callback(list)
+  })
+}
+
 // ── 단건 피드백 조회 ──────────────────────────────────────────────
 export async function getFeedback(id: string): Promise<Feedback | null> {
   const snap = await get(ref(db, `feedbacks/${id}`))

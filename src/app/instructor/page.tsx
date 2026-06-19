@@ -42,7 +42,7 @@ export default function InstructorPage() {
       setPendingFeedbacks(pending)
     }
     load()
-    const interval = setInterval(load, 30000)
+    const interval = setInterval(load, 3000)
     return () => clearInterval(interval)
   }, [authed])
 
