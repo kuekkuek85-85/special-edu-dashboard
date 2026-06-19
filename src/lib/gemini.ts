@@ -16,6 +16,7 @@ interface GeminiRequest {
   generationConfig?: {
     maxOutputTokens?: number
     temperature?: number
+    thinkingConfig?: { thinkingBudget: number }
   }
 }
 
@@ -45,6 +46,7 @@ export async function callGemini(
     generationConfig: {
       maxOutputTokens: maxTokens,
       temperature: 0.7,
+      thinkingConfig: { thinkingBudget: 0 },
     },
   }
 
