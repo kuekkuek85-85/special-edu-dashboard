@@ -68,7 +68,10 @@ export default function ParticipantDetailPage({
         }),
       })
 
-      if (!res.ok) throw new Error('피드백 생성에 실패했습니다.')
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || `피드백 생성 실패 (${res.status})`)
+      }
       const data = await res.json()
 
       await saveFeedbackDraft(participant.id, data.feedback, round)
