@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { subscribeParticipants, getPendingFeedbacks } from '@/lib/database'
+import { subscribeParticipants, getPendingFeedbacks, saveFeedbackDraft, saveLinkTestLog } from '@/lib/database'
 import type { Participant, Feedback, Status } from '@/types'
 import { STATUS_CONFIG } from '@/types'
 import RadialDashboard from '@/components/RadialDashboard'
@@ -21,6 +21,8 @@ export default function InstructorPage() {
   const [pendingFeedbacks, setPendingFeedbacks] = useState<(Feedback & { participant?: Participant })[]>([])
   const [filterStatus, setFilterStatus] = useState<FilterStatus>(null)
   const [view, setView] = useState<'radial' | 'list'>('radial')
+  const [bulkState, setBulkState] = useState<{ type: 'prd' | 'link'; current: number; total: number } | null>(null)
+  const [bulkResult, setBulkResult] = useState('')
 
   // 인증 확인
   useEffect(() => {
@@ -128,6 +130,71 @@ export default function InstructorPage() {
     )
   }
 
+  // ── 일괄 피드백 ────────────────────────────────────────────────
+  const pendingParticipantIds = new Set(pendingFeedbacks.map((f) => f.participantId))
+  const prdEligible = participants.filter(
+    (p) => p.prdTextV1 && !p.feedbackSent && !pendingParticipantIds.has(p.id),
+  )
+  const linkEligible = participants.filter(
+    (p) => p.artifactUrlV1 && !p.feedbackSent && !pendingParticipantIds.has(p.id),
+  )
+
+  const handleBulkPrdFeedback = async () => {
+    if (prdEligible.length === 0 || bulkState) return
+    setBulkResult('')
+    setBulkState({ type: 'prd', current: 0, total: prdEligible.length })
+    let ok = 0
+    for (let i = 0; i < prdEligible.length; i++) {
+      const p = prdEligible[i]
+      setBulkState({ type: 'prd', current: i + 1, total: prdEligible.length })
+      try {
+        const res = await fetch('/api/feedback/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ participantId: p.id, prdText: p.prdTextV1, round: 1, participantName: p.name, school: p.school }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          await saveFeedbackDraft(p.id, data.feedback, 1)
+          ok++
+        }
+      } catch { /* 다음 참가자 계속 */ }
+    }
+    setBulkState(null)
+    setBulkResult(`✅ PRD 일괄 피드백 완료 (${ok}/${prdEligible.length}명)`)
+    setTimeout(() => setBulkResult(''), 5000)
+  }
+
+  const handleBulkLinkFeedback = async () => {
+    if (linkEligible.length === 0 || bulkState) return
+    setBulkResult('')
+    setBulkState({ type: 'link', current: 0, total: linkEligible.length })
+    let ok = 0
+    for (let i = 0; i < linkEligible.length; i++) {
+      const p = linkEligible[i]
+      setBulkState({ type: 'link', current: i + 1, total: linkEligible.length })
+      try {
+        const res = await fetch('/api/link/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: p.artifactUrlV1, participantId: p.id }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          if (data.aiAnalysis) {
+            const draft = `🔗 산출물 링크 분석 피드백\n\n${data.aiAnalysis}`
+            const fid = await saveFeedbackDraft(p.id, draft, 1)
+            if (data.log) await saveLinkTestLog(fid, data.log)
+            ok++
+          }
+        }
+      } catch { /* 다음 참가자 계속 */ }
+    }
+    setBulkState(null)
+    setBulkResult(`✅ 링크 일괄 피드백 완료 (${ok}/${linkEligible.length}명)`)
+    setTimeout(() => setBulkResult(''), 5000)
+  }
+
   // ── 통계 계산 ──────────────────────────────────────────────────
   const statusCounts = participants.reduce(
     (acc, p) => {
@@ -157,6 +224,39 @@ export default function InstructorPage() {
         <button onClick={handleLogout} className="btn-secondary text-sm">
           로그아웃
         </button>
+      </div>
+
+      {/* 일괄 피드백 버튼 */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-5">
+        <p className="text-xs font-semibold text-slate-500 mb-3">⚡ 일괄 피드백 생성</p>
+        <div className="flex flex-wrap gap-3 items-center">
+          <button
+            onClick={handleBulkPrdFeedback}
+            disabled={!!bulkState || prdEligible.length === 0}
+            className="flex items-center gap-2 bg-indigo-500 text-white text-sm font-bold px-4 py-2.5 rounded-xl hover:bg-indigo-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {bulkState?.type === 'prd' ? (
+              <>🔄 PRD 처리 중 {bulkState.current}/{bulkState.total}</>
+            ) : (
+              <>🤖 PRD 일괄 피드백 {prdEligible.length > 0 && <span className="bg-white text-indigo-600 rounded-lg px-1.5 py-0.5 text-xs">{prdEligible.length}명</span>}</>
+            )}
+          </button>
+          <button
+            onClick={handleBulkLinkFeedback}
+            disabled={!!bulkState || linkEligible.length === 0}
+            className="flex items-center gap-2 bg-blue-500 text-white text-sm font-bold px-4 py-2.5 rounded-xl hover:bg-blue-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {bulkState?.type === 'link' ? (
+              <>🔄 링크 처리 중 {bulkState.current}/{bulkState.total}</>
+            ) : (
+              <>🔍 링크 일괄 피드백 {linkEligible.length > 0 && <span className="bg-white text-blue-600 rounded-lg px-1.5 py-0.5 text-xs">{linkEligible.length}명</span>}</>
+            )}
+          </button>
+          {bulkResult && (
+            <span className="text-sm font-semibold text-green-600">{bulkResult}</span>
+          )}
+        </div>
+        <p className="text-xs text-slate-400 mt-2">피드백 미발송 + 초안 없는 수강생 대상 · 생성 후 강사 검토 필요</p>
       </div>
 
       {/* 검토 대기 배지 */}
