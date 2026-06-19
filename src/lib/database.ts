@@ -11,9 +11,12 @@ import { db } from './firebase'
 import { calculateStatus } from './status'
 import type { Participant, Feedback } from '@/types'
 
-// RTDB 키 규칙: . # $ / [ ] 불가 → _ 로 치환
-const makeParticipantKey = (school: string, name: string) =>
-  `${school}__${name}`.replace(/[.#$/[\]]/g, '_')
+// RTDB 키: ASCII-safe (한글 등 비ASCII → xNNNN 16진수 변환)
+// 이유: URL 경로 파라미터로 쓸 때 Next.js SSR이 한글 인코딩을 다르게 처리하는 문제 방지
+const makeParticipantKey = (school: string, name: string): string =>
+  `${school}__${name}`.replace(/[^a-zA-Z0-9_-]/g, (c) =>
+    'x' + c.charCodeAt(0).toString(16).padStart(4, '0'),
+  )
 
 // ── 수강생 식별/생성 ──────────────────────────────────────────────
 export async function findOrCreateParticipant(
