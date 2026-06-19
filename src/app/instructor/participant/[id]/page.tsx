@@ -23,6 +23,7 @@ export default function ParticipantDetailPage({
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState<'prd' | 'link' | null>(null)
   const [verifyingLink, setVerifyingLink] = useState(false)
+  const [linkLog, setLinkLog] = useState('')
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
 
@@ -87,26 +88,24 @@ export default function ParticipantDetailPage({
   const handleVerifyLink = async (url: string, feedbackId?: string) => {
     if (!participant) return
     setVerifyingLink(true)
+    setLinkLog('')
     setError('')
     try {
       const res = await fetch('/api/link/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          url,
-          participantId: participant.id,
-          feedbackId,
-        }),
+        body: JSON.stringify({ url, participantId: participant.id, feedbackId }),
       })
 
-      if (!res.ok) throw new Error('링크 검증에 실패했습니다.')
-      const data = await res.json()
-      // 피드백이 있으면 로그 저장
-      if (feedbackId && data.log) {
-        await saveLinkTestLog(feedbackId, data.log)
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || `링크 검증 실패 (${res.status})`)
       }
-      showMessage('✅ 링크 분석 완료! 결과가 피드백에 추가되었습니다.')
-      await load()
+      const data = await res.json()
+      if (data.log) {
+        setLinkLog(data.log)
+        if (feedbackId) await saveLinkTestLog(feedbackId, data.log)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : '오류가 발생했습니다.')
     } finally {
@@ -249,6 +248,14 @@ export default function ParticipantDetailPage({
             </a>
           ) : (
             <p className="text-sm text-slate-400">아직 제출하지 않았습니다.</p>
+          )}
+          {linkLog && (
+            <div className="mt-4 bg-slate-50 border border-slate-200 rounded-xl p-4">
+              <p className="text-xs font-semibold text-slate-600 mb-2">🔍 링크 분석 결과</p>
+              <pre className="text-xs text-slate-600 whitespace-pre-wrap font-mono overflow-x-auto">
+                {linkLog}
+              </pre>
+            </div>
           )}
         </section>
 
