@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { subscribeParticipants, getPendingFeedbacks, saveFeedbackDraft, saveLinkTestLog, sendFeedback } from '@/lib/database'
 import type { Participant, Feedback, Status } from '@/types'
@@ -23,6 +23,10 @@ export default function InstructorPage() {
   const [view, setView] = useState<'radial' | 'list'>('radial')
   const [bulkState, setBulkState] = useState<{ type: 'prd' | 'link' | 'send'; current: number; total: number } | null>(null)
   const [bulkResult, setBulkResult] = useState('')
+  const [lotteryRunning, setLotteryRunning] = useState(false)
+  const [lotteryDisplay, setLotteryDisplay] = useState<{ name: string; school: string } | null>(null)
+  const [lotteryWinner, setLotteryWinner] = useState<{ name: string; school: string } | null>(null)
+  const lotteryRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // 인증 확인
   useEffect(() => {
@@ -128,6 +132,44 @@ export default function InstructorPage() {
         </div>
       </main>
     )
+  }
+
+  // ── 추첨 ───────────────────────────────────────────────────────
+  const greenParticipants = participants.filter((p) => p.status === 'GREEN')
+
+  const handleLottery = () => {
+    if (greenParticipants.length === 0 || lotteryRunning) return
+    setLotteryWinner(null)
+    setLotteryRunning(true)
+    const winner = greenParticipants[Math.floor(Math.random() * greenParticipants.length)]
+    // 점점 느려지는 딜레이 배열: 빠름 → 느림
+    const delays = [
+      ...Array(10).fill(60),
+      ...Array(8).fill(120),
+      ...Array(6).fill(220),
+      ...Array(4).fill(380),
+      ...Array(2).fill(550),
+    ]
+    let i = 0
+    const tick = () => {
+      if (i < delays.length) {
+        const rand = greenParticipants[Math.floor(Math.random() * greenParticipants.length)]
+        setLotteryDisplay({ name: rand.name, school: rand.school })
+        lotteryRef.current = setTimeout(tick, delays[i++]) as never
+      } else {
+        setLotteryDisplay({ name: winner.name, school: winner.school })
+        setLotteryWinner({ name: winner.name, school: winner.school })
+        setLotteryRunning(false)
+      }
+    }
+    tick()
+  }
+
+  const handleLotteryReset = () => {
+    if (lotteryRef.current) clearInterval(lotteryRef.current)
+    setLotteryRunning(false)
+    setLotteryDisplay(null)
+    setLotteryWinner(null)
   }
 
   // ── 일괄 발송 ──────────────────────────────────────────────────
@@ -246,6 +288,43 @@ export default function InstructorPage() {
           로그아웃
         </button>
       </div>
+
+      {/* 🎰 추첨 */}
+      {(lotteryDisplay || greenParticipants.length > 0) && (
+        <div className={`rounded-2xl p-5 mb-5 border-2 transition-all ${lotteryWinner ? 'bg-green-50 border-green-400' : 'bg-white border-slate-200'}`}>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-semibold text-slate-500">🏆 초록 참가자 추첨 <span className="text-green-600 font-bold">{greenParticipants.length}명</span></p>
+            <div className="flex gap-2">
+              {lotteryDisplay && (
+                <button onClick={handleLotteryReset} className="text-xs text-slate-400 hover:text-slate-600 underline">초기화</button>
+              )}
+              <button
+                onClick={handleLottery}
+                disabled={lotteryRunning || greenParticipants.length === 0}
+                className="bg-green-500 text-white text-sm font-bold px-5 py-2 rounded-xl hover:bg-green-600 transition-colors disabled:opacity-50"
+              >
+                {lotteryRunning ? '🎲 추첨 중...' : lotteryWinner ? '🔄 다시 추첨' : '🎰 추첨하기'}
+              </button>
+            </div>
+          </div>
+
+          {lotteryDisplay ? (
+            <div className="text-center py-4">
+              <div className={`text-5xl font-black tracking-tight transition-all duration-100 ${lotteryRunning ? 'text-slate-400 scale-95' : 'text-green-600 scale-110'}`}>
+                {lotteryDisplay.name}
+              </div>
+              <div className={`text-lg mt-2 transition-all ${lotteryRunning ? 'text-slate-300' : 'text-green-500 font-semibold'}`}>
+                {lotteryDisplay.school}
+              </div>
+              {lotteryWinner && (
+                <div className="mt-4 text-3xl animate-bounce">🎉🎊🎉</div>
+              )}
+            </div>
+          ) : (
+            <p className="text-center text-slate-400 text-sm py-3">버튼을 눌러 초록 참가자 중 한 명을 추첨하세요</p>
+          )}
+        </div>
+      )}
 
       {/* 일괄 피드백 버튼 */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-5">
