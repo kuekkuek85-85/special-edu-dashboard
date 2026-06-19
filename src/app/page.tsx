@@ -251,6 +251,16 @@ export default function StudentPage() {
         <p className="text-xs mt-2" style={{ color: statusCfg.textColor }}>
           {statusCfg.description}
         </p>
+        {participant.status === 'GREEN' && (
+          <div className="mt-3 pt-3 border-t border-green-200">
+            <a
+              href={`/growth/${participant.id}`}
+              className="inline-flex items-center gap-2 bg-green-600 text-white text-sm font-bold px-4 py-2 rounded-xl hover:bg-green-700 transition-colors"
+            >
+              📈 개인 성장 보고서 보기
+            </a>
+          </div>
+        )}
       </div>
 
       {/* 알림 메시지 */}

@@ -259,3 +259,23 @@ export async function saveLinkTestLog(
 ): Promise<void> {
   await update(ref(db, `feedbacks/${feedbackId}`), { linkTestLog: log })
 }
+
+// ── 성장 보고서 저장 ──────────────────────────────────────────────
+export async function saveGrowthReport(
+  participantId: string,
+  analysis: string,
+): Promise<void> {
+  await set(ref(db, `growthReports/${participantId}`), {
+    analysis,
+    generatedAt: Date.now(),
+  })
+}
+
+// ── 성장 보고서 조회 ──────────────────────────────────────────────
+export async function getGrowthReport(
+  participantId: string,
+): Promise<{ analysis: string; generatedAt: number } | null> {
+  const snap = await get(ref(db, `growthReports/${participantId}`))
+  if (!snap.exists()) return null
+  return snap.val()
+}

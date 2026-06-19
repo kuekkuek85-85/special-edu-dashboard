@@ -153,6 +153,14 @@ export default function ParticipantDetailPage({
           {participant.school} · {participant.name}
         </h1>
         <StatusBadge status={participant.status} />
+        {participant.status === 'GREEN' && (
+          <a
+            href={`/growth/${participant.id}`}
+            className="ml-auto text-sm bg-green-100 text-green-700 px-3 py-1.5 rounded-xl hover:bg-green-200 transition-colors font-semibold"
+          >
+            📈 성장 보고서
+          </a>
+        )}
       </div>
 
       {/* 알림 */}
