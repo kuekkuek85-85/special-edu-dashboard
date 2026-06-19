@@ -82,7 +82,7 @@ ${htmlContent}
 2. 장애학생이 사용하기에 접근성/사용편의성이 어떠한지
 3. 개선이 필요해 보이는 점 한 가지`,
           undefined,
-          1200,
+          2000,
         )
         log.push(`\n🤖 AI 분석 결과:\n${aiAnalysis}`)
       } catch {
