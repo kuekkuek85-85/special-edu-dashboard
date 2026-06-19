@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { subscribeParticipants, getPendingFeedbacks, saveFeedbackDraft, saveLinkTestLog } from '@/lib/database'
+import { subscribeParticipants, getPendingFeedbacks, saveFeedbackDraft, saveLinkTestLog, sendFeedback } from '@/lib/database'
 import type { Participant, Feedback, Status } from '@/types'
 import { STATUS_CONFIG } from '@/types'
 import RadialDashboard from '@/components/RadialDashboard'
@@ -21,7 +21,7 @@ export default function InstructorPage() {
   const [pendingFeedbacks, setPendingFeedbacks] = useState<(Feedback & { participant?: Participant })[]>([])
   const [filterStatus, setFilterStatus] = useState<FilterStatus>(null)
   const [view, setView] = useState<'radial' | 'list'>('radial')
-  const [bulkState, setBulkState] = useState<{ type: 'prd' | 'link'; current: number; total: number } | null>(null)
+  const [bulkState, setBulkState] = useState<{ type: 'prd' | 'link' | 'send'; current: number; total: number } | null>(null)
   const [bulkResult, setBulkResult] = useState('')
 
   // 인증 확인
@@ -128,6 +128,27 @@ export default function InstructorPage() {
         </div>
       </main>
     )
+  }
+
+  // ── 일괄 발송 ──────────────────────────────────────────────────
+  const handleBulkSend = async () => {
+    if (pendingFeedbacks.length === 0 || bulkState) return
+    if (!confirm(`검토 대기 중인 피드백 ${pendingFeedbacks.length}건을 AI 초안 그대로 일괄 발송하시겠습니까?`)) return
+    setBulkResult('')
+    setBulkState({ type: 'send' as never, current: 0, total: pendingFeedbacks.length })
+    let ok = 0
+    for (let i = 0; i < pendingFeedbacks.length; i++) {
+      const f = pendingFeedbacks[i]
+      setBulkState({ type: 'send' as never, current: i + 1, total: pendingFeedbacks.length })
+      try {
+        const text = f.instructorFinal ?? f.aiDraft
+        await sendFeedback(f.id, f.participantId, text)
+        ok++
+      } catch { /* 다음 계속 */ }
+    }
+    setBulkState(null)
+    setBulkResult(`✅ 일괄 발송 완료 (${ok}/${pendingFeedbacks.length}건)`)
+    setTimeout(() => setBulkResult(''), 5000)
   }
 
   // ── 일괄 피드백 ────────────────────────────────────────────────
@@ -252,11 +273,25 @@ export default function InstructorPage() {
               <>🔍 링크 일괄 피드백 {linkEligible.length > 0 && <span className="bg-white text-blue-600 rounded-lg px-1.5 py-0.5 text-xs">{linkEligible.length}명</span>}</>
             )}
           </button>
+          <div className="w-px h-8 bg-slate-200" />
+          <button
+            onClick={handleBulkSend}
+            disabled={!!bulkState || pendingFeedbacks.length === 0}
+            className="flex items-center gap-2 bg-green-600 text-white text-sm font-bold px-4 py-2.5 rounded-xl hover:bg-green-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {bulkState?.type === 'send' ? (
+              <>📤 발송 중 {bulkState.current}/{bulkState.total}</>
+            ) : (
+              <>📤 일괄 발송 {pendingFeedbacks.length > 0 && <span className="bg-white text-green-700 rounded-lg px-1.5 py-0.5 text-xs">{pendingFeedbacks.length}건</span>}</>
+            )}
+          </button>
           {bulkResult && (
             <span className="text-sm font-semibold text-green-600">{bulkResult}</span>
           )}
         </div>
-        <p className="text-xs text-slate-400 mt-2">피드백 미발송 + 초안 없는 수강생 대상 · 생성 후 강사 검토 필요</p>
+        <p className="text-xs text-slate-400 mt-2">
+          생성 버튼: 미발송·초안없는 수강생 대상 &nbsp;|&nbsp; 일괄 발송: 검토 대기 초안을 수강생에게 즉시 발송
+        </p>
       </div>
 
       {/* 검토 대기 배지 */}
