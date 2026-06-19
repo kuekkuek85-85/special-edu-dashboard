@@ -127,7 +127,7 @@ export default function StudentPage() {
     }
   }
 
-  const sentFeedback = feedbacks.find(
+  const sentFeedbacks = feedbacks.filter(
     (f) => f.reviewed && f.instructorFinal,
   )
 
@@ -345,7 +345,7 @@ export default function StudentPage() {
         </section>
 
         {/* ── 강사 피드백 ── */}
-        {sentFeedback && (
+        {sentFeedbacks.length > 0 && (
           <section className="card border-2 border-indigo-200">
             <h2 className="section-title text-indigo-700">
               💬 강사 피드백
@@ -353,8 +353,15 @@ export default function StudentPage() {
                 검토 완료 후 발송됨
               </span>
             </h2>
-            <div className="bg-indigo-50 rounded-xl p-4 text-sm text-slate-700 whitespace-pre-wrap max-h-80 overflow-y-auto border border-indigo-100">
-              {sentFeedback.instructorFinal}
+            <div className="space-y-3">
+              {sentFeedbacks.map((f, i) => (
+                <div key={f.id} className="bg-indigo-50 rounded-xl p-4 text-sm text-slate-700 whitespace-pre-wrap max-h-80 overflow-y-auto border border-indigo-100">
+                  {sentFeedbacks.length > 1 && (
+                    <p className="text-xs font-semibold text-indigo-400 mb-2">{i + 1}번째 피드백</p>
+                  )}
+                  {f.instructorFinal}
+                </div>
+              ))}
             </div>
           </section>
         )}
