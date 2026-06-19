@@ -16,6 +16,7 @@ export async function POST(req: NextRequest) {
 교육적·기술적 관점에서 구체적이고 실질적인 피드백을 제공합니다.
 
 피드백 원칙:
+- 전체 피드백은 반드시 500자 이내로 작성 (초과 금지)
 - 구체적이고 실행 가능한 피드백 제공
 - 교사의 노력을 인정하고 격려하는 톤 유지
 - 특수교육 현장의 현실적 맥락 반영
@@ -67,7 +68,7 @@ PRD에서 좋은 점을 구체적으로 2-3가지 칭찬해주세요. 어떤 점
 - **특수교육 적합성**: 이 앱이 특수교육 환경에서 실제로 활용 가능한가?
 - **접근성**: 큰 글자, 타이핑 최소화, 시각적 피드백 등 접근성 요소`
 
-    const feedback = await callGemini(userPrompt, systemPrompt, 2000)
+    const feedback = await callGemini(userPrompt, systemPrompt, 600)
     return NextResponse.json({ feedback })
   } catch (error) {
     console.error('AI 피드백 생성 오류:', error)
