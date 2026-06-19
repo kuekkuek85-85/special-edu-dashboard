@@ -252,7 +252,7 @@ export default function ParticipantDetailPage({
           {linkLog && (
             <div className="mt-4 bg-slate-50 border border-slate-200 rounded-xl p-4">
               <p className="text-xs font-semibold text-slate-600 mb-2">🔍 링크 분석 결과</p>
-              <pre className="text-xs text-slate-600 whitespace-pre-wrap font-mono overflow-x-auto">
+              <pre className="text-xs text-slate-600 whitespace-pre-wrap font-mono max-h-64 overflow-y-auto">
                 {linkLog}
               </pre>
             </div>
