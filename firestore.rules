@@ -1,0 +1,49 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 수강생 컬렉션
+    match /participants/{participantId} {
+      // 읽기: 누구나 (학교+이름으로 본인 카드 조회)
+      allow read: if true;
+
+      // 생성: 누구나 (첫 입장 시 카드 생성)
+      allow create: if
+        request.resource.data.school is string &&
+        request.resource.data.name is string &&
+        request.resource.data.school.size() > 0 &&
+        request.resource.data.name.size() > 0;
+
+      // 수정: 수강생 필드만 (feedbackSent, status는 클라이언트에서 자동 계산)
+      // 실제 배포 시에는 서버 측에서만 feedbackSent 변경 가능하도록 강화 필요
+      allow update: if
+        request.resource.data.school == resource.data.school &&
+        request.resource.data.name == resource.data.name;
+    }
+
+    // 피드백 컬렉션
+    match /feedbacks/{feedbackId} {
+      // 읽기: 누구나 (수강생이 본인 피드백 확인 가능)
+      allow read: if true;
+
+      // 생성: 누구나 (AI 피드백 초안 저장 — 실제 배포 시 강사 인증 필요)
+      allow create: if
+        request.resource.data.participantId is string &&
+        request.resource.data.aiDraft is string;
+
+      // 수정: 누구나 (강사 검토/발송 — 실제 배포 시 강사 인증 필요)
+      allow update: if true;
+    }
+  }
+}
+
+// ──────────────────────────────────────────────────────────────
+// 🔐 배포 전 보안 강화 체크리스트:
+//
+// 1. Firebase Authentication 연동으로 강사 전용 UID 생성
+// 2. feedbacks 컬렉션의 create/update를 강사 UID로만 허용
+// 3. participants의 feedbackSent 필드 변경도 강사 UID로만 허용
+// 4. 수강생은 자신의 문서만 update 가능하도록 제한
+//    (현재는 연수 현장용 경량 방식으로 전체 허용)
+// ──────────────────────────────────────────────────────────────
