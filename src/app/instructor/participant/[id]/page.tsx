@@ -85,7 +85,7 @@ export default function ParticipantDetailPage({
     }
   }
 
-  const handleVerifyLink = async (url: string, feedbackId?: string) => {
+  const handleVerifyLink = async (url: string) => {
     if (!participant) return
     setVerifyingLink(true)
     setLinkLog('')
@@ -94,7 +94,7 @@ export default function ParticipantDetailPage({
       const res = await fetch('/api/link/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url, participantId: participant.id, feedbackId }),
+        body: JSON.stringify({ url, participantId: participant.id }),
       })
 
       if (!res.ok) {
@@ -102,9 +102,14 @@ export default function ParticipantDetailPage({
         throw new Error(errData.error || `링크 검증 실패 (${res.status})`)
       }
       const data = await res.json()
-      if (data.log) {
-        setLinkLog(data.log)
-        if (feedbackId) await saveLinkTestLog(feedbackId, data.log)
+      if (data.log) setLinkLog(data.log)
+
+      if (data.aiAnalysis) {
+        const draft = `🔗 산출물 링크 분석 피드백\n\n${data.aiAnalysis}`
+        const newFeedbackId = await saveFeedbackDraft(participant.id, draft, 1)
+        if (data.log) await saveLinkTestLog(newFeedbackId, data.log)
+        await load()
+        showMessage('✅ 링크 분석 완료! 아래 피드백 히스토리에서 검토 후 발송하세요.')
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : '오류가 발생했습니다.')
@@ -227,9 +232,7 @@ export default function ParticipantDetailPage({
             </h2>
             {participant.artifactUrlV1 && (
               <button
-                onClick={() =>
-                  handleVerifyLink(participant.artifactUrlV1!, pendingFeedback?.id)
-                }
+                onClick={() => handleVerifyLink(participant.artifactUrlV1!)}
                 disabled={verifyingLink}
                 className="text-sm bg-blue-100 text-blue-700 px-4 py-2 rounded-xl hover:bg-blue-200 transition-colors font-semibold"
               >
